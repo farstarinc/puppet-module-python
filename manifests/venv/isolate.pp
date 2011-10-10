@@ -7,21 +7,21 @@ define python::venv::isolate($ensure=present,
   $python = $python::dev::python
 
   if $ensure == 'present' {
-    # Parent directory of root directory. /var/www for /var/www/blog
-    $root_parent = inline_template("<%= root.match(%r!(.+)/.+!)[1] %>")
-
-    if !defined(File[$root_parent]) {
-      file { $root_parent:
-        ensure => directory,
-        owner => $owner,
-        group => $group,
-      }
-    }
-
     Exec {
       user => $owner,
       group => $group,
       cwd => "/tmp",
+      logoutput => on_failure,
+    }
+  
+    $parent_dir = regsubst($root, '^(.+)/.+/?$', '\1')
+  
+    if !defined(File[$parent_dir]) {
+      file { $parent_dir:
+        ensure => directory,
+        owner => $owner,
+        group => $group,
+      }
     }
 
     # Does not successfully run as www-data on Debian:
@@ -29,8 +29,7 @@ define python::venv::isolate($ensure=present,
       command => "virtualenv -p `which ${python}` ${root}",
       creates => $root,
       notify => Exec["update distribute and pip in $root"],
-      require => [File[$root_parent],
-                  Package["python-virtualenv"]],
+      require => [File[$parent_dir], Package["python-virtualenv"]],
     }
 
     # Some newer Python packages require an updated distribute

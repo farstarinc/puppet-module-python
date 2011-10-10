@@ -1,0 +1,17 @@
+description "gunicorn-<%= name %>"
+
+env NAME=gunicorn-<%= name %>
+env VENV=<%= venv %>
+env DAEMON=$VENV/bin/gunicorn<% if django %>_django<% end %>
+env SOCKET=<%= socket %>
+env LOGFILE=<%= logfile %>
+env WORKERS=<%= workers %>
+env MODULE=<%= django ? django_settings : wsgi_module %>
+env OWNER=<%= owner %>
+env DAEMON_OPTS="-b $SOCKET -p $PIDFILE --log-file $LOGFILE --workers $WORKERS --name $NAME $MODULE"
+
+start on runlevel [2345]
+stop on runlevel [06]
+respawn limit 10 5
+
+exec su -s /bin/sh -c 'exec "$0" "$@"' $OWNER -- $DAEMON $DAEMON_OPTS

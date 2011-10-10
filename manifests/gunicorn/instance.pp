@@ -5,7 +5,8 @@ define python::gunicorn::instance($venv,
                                   $django=false,
                                   $django_settings="",
                                   $version=undef,
-                                  $workers=1) {
+                                  $workers=1,
+                                  $upstart=false) {
   $is_present = $ensure == "present"
 
   $rundir = $python::gunicorn::rundir
@@ -13,7 +14,11 @@ define python::gunicorn::instance($venv,
   $owner = $python::gunicorn::owner
   $group = $python::gunicorn::group
 
-  $initscript = "/etc/init.d/gunicorn-${name}"
+  $initscript = $upstart ? {
+    false => "/etc/init.d/gunicorn-${name}",
+    true => "/etc/init/gunicorn-${name}.conf",
+    default => "/etc/init/${upstart}.conf"
+  }
   $pidfile = "$rundir/$name.pid"
   $socket = "unix:$rundir/$name.sock"
   $logfile = "$logdir/$name.log"
@@ -33,6 +38,15 @@ define python::gunicorn::instance($venv,
   $gunicorn_package = $version ? {
     undef => "gunicorn",
     default => "gunicorn==${version}",
+  }
+
+  $venv_parent_dir = regsubst($venv, '^(.+)/.+/?$', '\1')
+  if !defined(File[$venv_parent_dir]) {
+    file { $parent_dir:
+      ensure => directory,
+      owner => $owner,
+      group => $group,
+    }
   }
 
   if $is_present {
@@ -60,7 +74,10 @@ define python::gunicorn::instance($venv,
 
   file { $initscript:
     ensure => $ensure,
-    content => template("python/gunicorn.init.erb"),
+    content => $upstart ? {
+        false => template("python/gunicorn.init.erb"),
+        default => template("python/gunicorn.upstart.erb"),
+    },
     mode => 744,
     require => File["/etc/logrotate.d/gunicorn-${name}"],
   }
@@ -69,8 +86,17 @@ define python::gunicorn::instance($venv,
     ensure => $ensure,
     content => template("python/gunicorn.logrotate.erb"),
   }
-
+  
   service { "gunicorn-${name}":
+    name  => $upstart ? {
+      false => "gunicorn-${name}",
+      true => "gunicorn-${name}",
+      default => $upstart,
+    },
+    provider => $upstart ? {
+        false => undef,
+        default => "upstart",
+    },
     ensure => $is_present,
     enable => $is_present,
     hasstatus => $is_present,
