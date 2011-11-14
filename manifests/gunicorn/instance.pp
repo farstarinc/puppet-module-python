@@ -6,14 +6,17 @@ define python::gunicorn::instance($venv,
                                   $django_settings="",
                                   $version=undef,
                                   $workers=1,
+                                  $init=true,
                                   $upstart=false) {
+
+  $has_init = ($init or $upstart)
   $is_present = $ensure == "present"
 
   $rundir = $python::gunicorn::rundir
   $logdir = $python::gunicorn::logdir
   $owner = $python::gunicorn::owner
   $group = $python::gunicorn::group
-
+  
   $initscript = $upstart ? {
     false => "/etc/init.d/gunicorn-${name}",
     true => "/etc/init/gunicorn-${name}.conf",
@@ -72,8 +75,13 @@ define python::gunicorn::instance($venv,
     }
   }
 
-  file { $initscript:
+  file { "/etc/logrotate.d/gunicorn-${name}":
     ensure => $ensure,
+    content => template("python/gunicorn.logrotate.erb"),
+  }
+  
+  file { $initscript:
+    ensure => ($ensure and $has_init),
     content => $upstart ? {
         false => template("python/gunicorn.init.erb"),
         default => template("python/gunicorn.upstart.erb"),
@@ -82,36 +90,28 @@ define python::gunicorn::instance($venv,
     require => File["/etc/logrotate.d/gunicorn-${name}"],
   }
 
-  file { "/etc/logrotate.d/gunicorn-${name}":
-    ensure => $ensure,
-    content => template("python/gunicorn.logrotate.erb"),
-  }
-  
-  service { "gunicorn-${name}":
-    name  => $upstart ? {
-      false => "gunicorn-${name}",
-      true => "gunicorn-${name}",
-      default => $upstart,
-    },
-    provider => $upstart ? {
-        false => undef,
-        default => "upstart",
-    },
-    ensure => $is_present,
-    enable => $is_present,
-    hasstatus => $is_present,
-    hasrestart => $is_present,
-    subscribe => $ensure ? {
-      'present' => File[$initscript],
-      default => undef,
-    },
-    require => $ensure ? {
-      'present' => File[$initscript],
-      default => undef,
-    },
-    before => $ensure ? {
-      'absent' => File[$initscript],
-      default => undef,
-    },
-  }
+  # This doesn't work because the service is dependent upon the init script
+  #service { "gunicorn-${name}":
+  #  name  => $upstart ? {
+  #    false => "gunicorn-${name}",
+  #    true => "gunicorn-${name}",
+  #    default => $upstart,
+  #  },
+  #  provider => $upstart ? {
+  #      false => undef,
+  #      default => "upstart",
+  #  },
+  #  ensure => $is_present,
+  #  enable => $is_present,
+  #  hasstatus => $is_present,
+  #  hasrestart => $is_present,
+  #  subscribe => $ensure ? {
+  #    'present' => File[$initscript],
+  #    default => undef,
+  #  },
+  #  require => $ensure ? {
+  #    'present' => File[$initscript],
+  #    default => undef,
+  #  },
+  #}
 }

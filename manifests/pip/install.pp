@@ -8,8 +8,8 @@ define python::pip::install($package, $venv, $ensure=present,
   }
 
   Exec {
-    user => $owner,
-    group => $group,
+    user => $python::pip::install_user,
+    group => $python::pip::install_group,
     cwd => "/tmp",
   }
 

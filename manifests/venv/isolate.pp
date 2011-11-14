@@ -26,11 +26,19 @@ define python::venv::isolate($ensure=present,
 
     # Does not successfully run as www-data on Debian:
     exec { "python::venv $root":
-      command => "virtualenv -p `which ${python}` ${root}",
+      command => "virtualenv --no-site-packages -p `which ${python}` ${root}",
       creates => $root,
       notify => Exec["update distribute and pip in $root"],
       require => [File[$parent_dir], Package["python-virtualenv"]],
     }
+    ->
+    # ensure correct permissions on created virtualenv
+    file { $root:
+      ensure => directory,
+      owner => $owner,
+      group => $group,
+      mode => 775,
+    } 
 
     # Some newer Python packages require an updated distribute
     # from the one that is in repos on most systems:

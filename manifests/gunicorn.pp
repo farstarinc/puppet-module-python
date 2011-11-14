@@ -8,6 +8,7 @@ class python::gunicorn($ensure=present, $owner=undef, $group=undef, $upstart=fal
       ensure => directory,
       owner => $owner,
       group => $group,
+      mode => 770,
     }
 
   } elsif $ensure == 'absent' {
